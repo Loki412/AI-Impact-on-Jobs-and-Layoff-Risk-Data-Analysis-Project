@@ -1,0 +1,141 @@
+﻿VibeTrends AI 项目技术栈与核心需求蓝图规划书（已实现版本 v2.0）
+本规划书依据 2026 年 6 月 24 日的实际代码库状态更新，标记 [已实现] 为已完成模块，供组员撰写期末文档时参考。
+
+一、 项目定位与选题背景
+* 项目名称：VibeTrends AI: AIGC与就业冲击及跨界编程(Vibe Coding)趋势诊断平台
+* 目标用户：劳动力市场研究学者、科技新闻记者、面临转型求职的学生及独立开发者。
+* 核心立意：
+AIGC 的兴起使高度重复性工作面临自动化替代风险（Layoff Risk）。与此同时，以 AI 协同（Cursor, Claude）为代表的 Vibe Coding 浪潮降低了零代码背景人群的开发门槛。本平台通过数据过滤、AI 动态绘图与智能体交互，深度诊断这一职场变革趋势。
+
+二、 [已实现] 可选分析模组：解决用户冷启动痛点
+Tab 1 顶部内置四张 CSS 卡片式按钮（一键执行），用户无需输入，点击即触发 LLM 生成 Plotly 图表：
+   1. Automation vs Layoff Risk (Impact Model)
+      -> Routine_Task_Percentage + Tasks_Automated_Percentage vs Layoff_Risk
+   2. Creativity & Human Interaction (Safe Haven Model)
+      -> Creativity_Requirement + Human_Interaction_Level 作为就业护城河
+   3. AI Learning & Adaptability (Transition Curve)
+      -> Education_Level vs AI_Usage_Hours_Per_Week + AI_Training_Hours
+   4. AI Tools & Experience Gap (Tech Generation Divide)
+      -> Age + Years_of_Experience vs Number_of_AI_Tools_Used
+
+三、 核心项目要求对齐表（[已实现] 标记当前完成状态）
+
+| 评审指标 | 实现方式 | 对应模块 |
+|---------|---------|---------|
+| [已实现] 基础交互界面 (Streamlit) | 全英文现代化响应看板 + 自适应 CSS | app.py UI |
+| [已实现] 一键分析模块 (Click to Run) | 四大预设分析卡片，点击即自动出图 | app.py preset cards |
+| [已实现] 基础数据探索 (Filtering) | 行业/风险/学历/规模 四维侧边栏筛选器 + st.dataframe | st.sidebar, Tab 3 |
+| [已实现] LLM 特性 1: 动态可视化 | 自然语言/一键卡片 -> LLM 生成 Plotly 代码 -> importlib 热加载 | generate_visualization(), dynamic.py |
+| [已实现] LLM 特性 2: 求职咨询 | AI 职业顾问，基于工具返回数据生成转型策略 | agent_process(), Tab 2 |
+| [已实现] Bonus 1: Tool Use | stats_analytics 调用真实 Pandas 聚合，杜绝幻觉 | AgentTools.stats_analytics() |
+| [已实现] Bonus 2: AI Agent 架构 | st.status() 展示 Thought -> Action -> Observation 全链路 | agent_process() + st.status() |
+| [已实现] Online Source | data_fetcher 集成多源爬虫（V2EX + Hacker News），失败自动 mock 降级 + CSV 持久化 | AgentTools.data_fetcher(), v2ex_crawler.py |
+| [已实现] API Key 终端输入 | getpass 启动时静默输入，侧边栏仅显示配置状态 | app.py 启动逻辑 |
+| [已实现] 多 API 提供商切换 | 侧边栏选择 SiliconFlow / DeepSeek / 自定义 | st.sidebar selectbox |
+| [已实现] 爬取数据持久化 | 每次爬取自动追加到 crawled_data.csv，基于标题去重 | DataPersistence.save/load_history |
+
+四、 [已实现] 核心技术栈选型（经实际测试验证）
+* 前端展现层：Streamlit 1.56.0
+* 数据处理层：Pandas 3.0.3, Numpy 2.4.6
+* 动态可视化：Plotly Express 6.8.0
+* 大语言模型接口：OpenAI SDK 2.41.1，支持 SiliconFlow / DeepSeek / 自定义端点
+* 动态热加载：importlib.reload()
+* 网络爬虫：requests 2.34.2 + BeautifulSoup 4
+
+五、 完整项目文件结构（当前实际状态）
+VibeTrends_AI/
+    app.py                 # 主程序：Streamlit UI + Agent + Tool 物理函数 + 预设分析卡片
+    ai_api.py              # LLM 网关：OpenAI 兼容流式调用
+    data_query.py          # 动态绘图 Prompt 管理 + PromptManager
+    dynamic.py             # AI 生成 Plotly 代码沙盒（热加载）
+    v2ex_crawler.py        # 多源舆情爬虫：V2EX + Hacker News + CSV 持久化 + Mock 降级
+    ai-impact-jobs-layoff-risk-dataset.csv  # 16 维 AIGC 就业冲击数据集（20000 行）
+    crawled_data.csv       # 爬取历史数据（自动生成，UTF-8 BOM 编码）
+    README.txt             # 英文部署说明
+    项目规划书.txt          # 本文件
+    用户说明书.doc          # 用户使用手册（中文）
+    .streamlit/
+        config.toml        # Streamlit 配置：runOnSave = true
+
+六、 核心功能运作流程说明
+1. 动态 Plotly 绘图引擎流程 (Tab 1)
+[ 用户点击一键卡片 或 输入自定义 query ]
+    -> PromptManager 拼接数据集 Schema
+    -> ChatGateway 向 LLM 请求生成 Python 代码
+    -> 覆写 dynamic.py -> importlib.reload(dynamic) 热加载
+    -> Streamlit 渲染 Plotly 交互式图表
+
+2. AI Agent 工作流 (Tab 2)
+[ 用户输入问题 ]
+    -> st.status() 展开思考链
+       - Stage 1: Thought（意图识别：计算/舆情/咨询）
+       - Stage 2: Action（路由调用 stats_analytics / data_fetcher）
+       - Stage 3: Observation（工具返回硬数据）
+       - Stage 4: LLM 基于硬数据生成最终回复
+    -> 带数据支撑的分析报告
+
+3. 多源数据爬虫工作机制（v2.0 增强版）
+[ Agent 判断为舆情类问题 ]
+    -> v2ex_crawler.MultiSourceCrawler.search_all(keyword)
+       - 并行查询 V2EX（requests + bs4）+ Hacker News（Algolia REST API）
+       - V2EX 优先搜索 /search?q=，无结果回退 /go/programmer 节点
+       - HN 无需 API Key，直接调用 hn.algolia.com/api/v1/search
+       - 结果合并去重（基于标题相似度）
+    -> DataPersistence.save() 自动追加到 crawled_data.csv
+    -> 格式化输出 -> 结果返回 Agent -> LLM 润色
+    -> 全部网络失败则自动降级 Mock 数据
+
+七、 数据集详细信息
+* 数据源：Kaggle AI Impact on Jobs and Layoff Risk Dataset
+* 规模：20,000 条员工记录，16 个维度
+* 8 个行业：Education, Finance, Healthcare, IT, Logistics, Manufacturing, Retail, Telecom
+* 24 个岗位：Software Engineer, Data Analyst, Accountant, Nurse 等
+* 4 个学历等级：High School, Bachelor's, Master's, PhD
+* 3 个公司规模：Small, Medium, Large
+* 失业风险分布：High 6797 / Medium 6601 / Low 6602（近似均匀）
+* 数据完整性：全部 16 列零空值，无需预处理
+
+八、 项目功能测试报告（2026 年 6 月 24 日）
+
+| 测试项目 | 测试方法 | 结果 |
+|---------|---------|------|
+| Python 语法检查 | py_compile.compile() 全部 5 个 .py 文件 | [通过] 无语法错误 |
+| 依赖导入测试 | import streamlit/pandas/plotly/openai/requests/bs4 | [通过] 全部成功 |
+| 依赖版本确认 | 检查各库实际版本号 | [通过] streamlit 1.56.0, pandas 3.0.3, plotly 6.8.0, openai 2.41.1, numpy 2.4.6, requests 2.34.2 |
+| 模块导入测试 | 逐模块 import Chat/V2EXCrawler/HackerNewsCrawler/MultiSourceCrawler/PromptManager/dynamic | [通过] 全部成功 |
+| CSV 数据集验证 | pd.read_csv() + 数据完整性检查 | [通过] 20000 行, 16 列, 0 空值 |
+| 数据分布验证 | Layoff_Risk 分布统计 | [通过] High: 6797, Medium: 6601, Low: 6602（近似均匀） |
+| 分类变量验证 | Industry/Education_Level/Company_Size/Job_Role | [通过] 8 行业, 4 学历, 3 规模, 24 岗位 |
+| Hacker News API 测试 | HackerNewsCrawler.search('AI', 3) | [通过] 返回 3 条真实结果 |
+| V2EX 爬虫测试 | V2EXCrawler.search('vibe coding') | [通过] 网络请求正常 |
+| 多源聚合测试 | MultiSourceCrawler.search_all('vibe coding', 3) | [通过] 合并去重正常 |
+| CSV 持久化测试 | DataPersistence.save() + load_history() | [通过] 追加写入 + 去重正常 |
+| PromptManager 测试 | generate_prompt() 生成完整 Prompt | [通过] 长度 2845 字符 |
+| 代码质量检查 | AST 语法树分析 + 代码行数统计 | [通过] 无严重问题 |
+
+测试结论：
+- 全部核心模块功能正常，无阻塞性 Bug
+- 数据集完整无缺失，分类变量分布合理
+- 多源爬虫（V2EX + Hacker News）实时采集正常，HN 返回真实 Vibe Coding 讨论
+- CSV 持久化功能正常：追加写入、自动去重、历史查询
+- V2EX/HN 网络失败时正确降级为 Mock 数据
+- LLM 网关（ai_api.py）支持流式/非流式两种模式
+
+九、 后续开发及文档里程碑规划（截止 2026 年 7 月 5 日 21:00）
+第一阶段（6月中旬）- [完成]
+   - app.py 全英文 UI 整合完毕
+   - 四大预设分析卡片实现
+   - V2EX 爬虫集成
+   - 多 API 提供商切换支持
+
+第二阶段（6月下旬）- [完成]
+   - 多源爬虫扩展：V2EX + Hacker News 双源并行采集
+   - CSV 数据持久化：自动追加写入 + 去重 + 历史查询
+   - Tab 3 新增爬取历史展示区域
+   - PM 撰写期末总结报告（中文），描述系统现实意义
+   - 编写用户使用手册（已有 用户说明书.doc 初稿）
+   - 整理四大分析维度的统计发现与商业结论
+
+第三阶段（7月初）- 提交
+   - 最终代码审查与 bug 修复
+   - 7 月 5 日 21:00 前向 Moodle 提交

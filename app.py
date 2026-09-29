@@ -46,7 +46,7 @@ pio.templates["vibe_dark"].layout.update(
     legend=dict(font=dict(color="#c0cce0")),
 )
 
-BUILTIN_API_KEY = "sk-477e83c9fa4c46f399a1dbaa6f681098"
+BUILTIN_API_KEY = "请自行输入个人的api key"
 BUILTIN_BASE_URL = "https://api.deepseek.com"
 BUILTIN_MODEL = "deepseek-chat"
 
